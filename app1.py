@@ -1,58 +1,39 @@
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
-import streamlit as st
-import pandas as pd
+   import streamlit as st
+   import gspread
+   from google.oauth2.service_account import Credentials
+   import pandas as pd
 
-# Authenticate and connect to Google Sheets
-def connect_to_gsheet(creds_json, spreadsheet_name, sheet_name):
-    scope = ["https://spreadsheets.google.com/feeds", 
-             'https://www.googleapis.com/auth/spreadsheets',
-             "https://www.googleapis.com/auth/drive.file", 
-             "https://www.googleapis.com/auth/drive"]
-    
-    credentials = ServiceAccountCredentials.from_json_keyfile_name(creds_json, scope)
-    client = gspread.authorize(credentials)
-    spreadsheet = client.open(spreadsheet_name)  
-    return spreadsheet.worksheet(sheet_name)  # Access specific sheet by name
+   # Load Google Sheets credentials securely
+   def get_gsheet_client():
+       scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+       creds = Credentials.from_service_account_file("credentials.json", scopes=scope)
+       return gspread.authorize(creds)
 
-# Google Sheet credentials and details
-SPREADSHEET_NAME = 'Streamlit'
-SHEET_NAME = 'Sheet1'
-CREDENTIALS_FILE = './credentials.json'
+   # Google Sheet details
+   SHEET_NAME = "Streamlit"
+   SHEET_URL = "https://docs.google.com/spreadsheets/d/1BPVjObWp4nghthQ9VPXoreZjpAhV4lAFvRQ4CXjzak4/edit?gid=0#gid=0"
 
-# Connect to the Google Sheet
-sheet_by_name = connect_to_gsheet(CREDENTIALS_FILE, SPREADSHEET_NAME, sheet_name=SHEET_NAME)
+   # Initialize Google Sheets client
+   gc = get_gsheet_client()
+   sheet = gc.open(SHEET_NAME).sheet1  # Access first sheet
 
-st.title("Simple Data Entry using Streamlit")
+   # Streamlit UI
+   st.title("Google Sheets API with Streamlit")
+   st.write("Store data in Google Sheets using a Streamlit API")
 
-# Read Data from Google Sheets
-def read_data():
-    data = sheet_by_name.get_all_records()  # Get all records from Google Sheet
-    return pd.DataFrame(data)
+   name = st.text_input("Enter your name")
+   email = st.text_input("Enter your email")
+   message = st.text_area("Enter your message")
 
-# Add Data to Google Sheets
-def add_data(row):
-    sheet_by_name.append_row(row)  # Append the row to the Google Sheet
+   if st.button("Submit"):
+       if name and email and message:
+           sheet.append_row([name, email, message])
+           st.success("Data stored successfully!")
+       else:
+           st.error("Please fill in all fields")
 
-# Sidebar form for data entry
-with st.sidebar:
-    st.header("Enter New Data")
-    # Assuming the sheet has columns: 'Name', 'Age', 'Email'
-    with st.form(key="data_form"):
-        name = st.text_input("Name")
-        age = st.number_input("Age", min_value=0, max_value=120)
-        email = st.text_input("Email")
-        # Submit button inside the form
-        submitted = st.form_submit_button("Submit")
-        # Handle form submission
-        if submitted:
-            if name and email:  # Basic validation to check if required fields are filled
-                add_data([name, age, email])  # Append the row to the sheet
-                st.success("Data added successfully!")
-            else:
-                st.error("Please fill out the form correctly.")
-
-# Display data in the main view
-st.header("Data Table")
-df = read_data()
-st.dataframe(df, width=800, height=400)
+   # Show current data
+   st.subheader("Stored Data")
+   data = sheet.get_all_values()
+   df = pd.DataFrame(data[1:], columns=data[0])  # Convert to DataFrame
+   st.dataframe(df)
