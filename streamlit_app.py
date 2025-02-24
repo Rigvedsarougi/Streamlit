@@ -1,49 +1,41 @@
-# streamlit_app.py
-
 import streamlit as st
-from streamlit_gsheets import GSheetsConnection
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+import pandas as pd
 
-# Set up the title of the app
-st.title("Google Sheets Data Entry App")
+# Function to authenticate and connect to Google Sheets
+def connect_to_google_sheets():
+    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
+    client = gspread.authorize(creds)
+    return client
 
-# Create a connection to Google Sheets
-conn = st.connection("gsheets", type=GSheetsConnection)
+# Function to append data to the Google Sheet
+def append_to_sheet(data, sheet_url):
+    client = connect_to_google_sheets()
+    sheet = client.open_by_url(sheet_url).sheet1
+    sheet.append_row(data)
 
-# Function to read data from Google Sheets
-def read_data():
-    df = conn.read(worksheet="Sheet1", ttl="10m")
-    return df
+# Streamlit app
+def main():
+    st.title("Data Entry App")
 
-# Function to write data to Google Sheets
-def write_data(data):
-    conn.update(worksheet="Sheet1", data=data)
+    # Form for data entry
+    with st.form("data_entry_form"):
+        name = st.text_input("Name")
+        email = st.text_input("Email")
+        age = st.number_input("Age", min_value=0, max_value=120)
+        submit_button = st.form_submit_button("Submit")
 
-# Main form for data entry
-with st.form("data_entry_form"):
-    st.write("Enter your details below:")
-    
-    name = st.text_input("Name")
-    pet = st.text_input("Pet")
-    
-    submitted = st.form_submit_button("Submit")
-    
-    if submitted:
-        if name and pet:
-            # Read existing data
-            df = read_data()
-            
-            # Append new data
-            new_data = {"name": [name], "pet": [pet]}
-            new_df = df.append(new_data, ignore_index=True)
-            
-            # Write updated data back to Google Sheets
-            write_data(new_df)
-            
-            st.success("Data submitted successfully!")
-        else:
-            st.error("Please fill in all fields.")
+    if submit_button:
+        # Prepare data for submission
+        data = [name, email, age]
+        
+        # Append data to Google Sheet
+        sheet_url = "https://docs.google.com/spreadsheets/d/1BPVjObWp4nghthQ9VPXoreZjpAhV4lAFvRQ4CXjzak4/edit?gid=0#gid=0"
+        append_to_sheet(data, sheet_url)
+        
+        st.success("Data submitted successfully!")
 
-# Display the current data in the Google Sheet
-st.write("Current Data in Google Sheet:")
-df = read_data()
-st.dataframe(df)
+if __name__ == "__main__":
+    main()
