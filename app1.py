@@ -1,69 +1,41 @@
 import streamlit as st
+from streamlit_gsheets import GSheetsConnection
 import pandas as pd
-import json
-from google.oauth2.service_account import Credentials
-from googleapiclient.discovery import build
 
-# Load Google Sheets API credentials
-try:
-    creds_json = json.loads(st.secrets["GOOGLE_CREDENTIALS"])
-    creds = Credentials.from_service_account_info(creds_json, scopes=["https://www.googleapis.com/auth/spreadsheets"])
-    service = build("sheets", "v4", credentials=creds)
-    st.success("Connected to Google Sheets API")
-except Exception as e:
-    st.error(f"Error loading credentials: {e}")
-    st.stop()
+# Set page title
+st.set_page_config(page_title="Google Sheets Data Entry", layout="centered")
 
-# Google Sheet details
-SPREADSHEET_ID = "your_google_sheet_id_here"  # Replace with your actual Sheet ID
-RANGE_NAME = "Sheet1!A1:D100"  # Adjust range as needed
+# Create a connection object
+conn = st.connection("gsheets", type=GSheetsConnection)
 
-def read_sheet():
-    """Fetch data from Google Sheet and return as DataFrame."""
-    try:
-        sheet = service.spreadsheets()
-        result = sheet.values().get(spreadsheetId=SPREADSHEET_ID, range=RANGE_NAME).execute()
-        values = result.get("values", [])
-        if not values:
-            return pd.DataFrame()
-        return pd.DataFrame(values[1:], columns=values[0])  # Convert to DataFrame
-    except Exception as e:
-        st.error(f"Failed to fetch data: {e}")
-        return pd.DataFrame()
+# Read existing data
+sheet_url = "https://docs.google.com/spreadsheets/d/1BPVjObWp4nghthQ9VPXoreZjpAhV4lAFvRQ4CXjzak4/edit?gid=0#gid=0"  # Replace with your sheet URL
+df = conn.read(worksheet="Sheet1")
 
-def append_to_sheet(data):
-    """Append new data to Google Sheet."""
-    try:
-        sheet = service.spreadsheets()
-        sheet.values().append(
-            spreadsheetId=SPREADSHEET_ID,
-            range=RANGE_NAME,
-            valueInputOption="RAW",
-            body={"values": data}
-        ).execute()
+# Ensure the DataFrame has the correct structure
+if df is None or df.empty:
+    df = pd.DataFrame(columns=["name", "pet"])
+
+# UI for data entry
+st.title("Google Sheets Data Entry App")
+
+name = st.text_input("Enter Name:")
+pet = st.selectbox("Select Pet:", ["dog", "cat", "bird", "other"])
+
+if st.button("Submit"):
+    if name:
+        # Append new data
+        new_data = pd.DataFrame({"name": [name], "pet": [pet]})
+        updated_df = pd.concat([df, new_data], ignore_index=True)
+        
+        # Write back to Google Sheet
+        conn.update(worksheet="Sheet1", data=updated_df)
+        
         st.success("Data added successfully!")
-    except Exception as e:
-        st.error(f"Error writing data: {e}")
+        st.experimental_rerun()
+    else:
+        st.error("Please enter a name.")
 
-# Streamlit UI
-st.title("Google Sheets Data Management with Streamlit")
-
-data = read_sheet()
-st.write("### Current Data in Google Sheet")
-st.dataframe(data)
-
-with st.form("entry_form"):
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        name = st.text_input("Name")
-    with col2:
-        email = st.text_input("Email")
-    with col3:
-        phone = st.text_input("Phone")
-    with col4:
-        city = st.text_input("City")
-    submitted = st.form_submit_button("Add Entry")
-
-if submitted and name and email:
-    append_to_sheet([[name, email, phone, city]])
-    st.experimental_rerun()  # Refresh the page to show new data
+# Display current data
+st.subheader("Current Data")
+st.dataframe(df)
