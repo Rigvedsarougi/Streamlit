@@ -1,16 +1,8 @@
 # .gitignore
-
-# Ignore the Streamlit secrets file
-.streamlit/secrets.toml
-
-# Ignore Python cache files
+credentials.json
 __pycache__/
 *.pyc
-
-# Ignore virtual environment files
-venv/
-env/
-
-# Ignore IDE specific files
-.vscode/
-.idea/
+*.pyo
+*.pyd
+*.db
+*.sqlite3
