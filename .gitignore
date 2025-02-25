@@ -1,8 +1,1 @@
-# .gitignore
-credentials.json
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-*.db
-*.sqlite3
+invoice_data.db
